@@ -1,5 +1,4 @@
 using MongoDB.Driver;
-using MongoDB.Bson;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,11 +14,7 @@ public class ContentRepository
         _collection = database.GetCollection<Content>("content");
     }
 
-    private int GetNextId()
-    {
-        var maxId = _collection.AsQueryable().Any() ? _collection.AsQueryable().Max(c => c.Id) : 0;
-        return maxId + 1;
-    }
+    private int GetNextId() => _collection.AsQueryable().Max(c => (int?)c.Id) + 1 ?? 1;
 
     public void CreateContent(Content content)
     {
@@ -28,23 +23,26 @@ public class ContentRepository
         Console.WriteLine("Conteúdo criado com sucesso!");
     }
 
-    public List<Content> ReadContents()
-    {
-        return _collection.Find(new BsonDocument()).ToList();
-    }
+    public List<Content> ReadContents() => _collection.AsQueryable().ToList();
 
     public void UpdateContent(int id, string newDescription)
     {
-        var filter = Builders<Content>.Filter.Eq(c => c.Id, id);
-        var update = Builders<Content>.Update.Set(c => c.Description, newDescription);
-        _collection.UpdateOne(filter, update);
-        Console.WriteLine("Conteúdo atualizado com sucesso!");
+        var content = _collection.AsQueryable().FirstOrDefault(c => c.Id == id);
+        if (content != null)
+        {
+            content.Description = newDescription;
+            _collection.ReplaceOne(c => c.Id == id, content);
+            Console.WriteLine("Conteúdo atualizado com sucesso!");
+        }
+        else
+        {
+            Console.WriteLine("Conteúdo não encontrado.");
+        }
     }
 
     public void DeleteContent(int id)
     {
-        var filter = Builders<Content>.Filter.Eq(c => c.Id, id);
-        _collection.DeleteOne(filter);
-        Console.WriteLine("Conteúdo excluído com sucesso!");
+        var result = _collection.DeleteOne(c => c.Id == id);
+        Console.WriteLine(result.DeletedCount > 0 ? "Conteúdo excluído com sucesso!" : "Conteúdo não encontrado.");
     }
 }
